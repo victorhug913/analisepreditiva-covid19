@@ -6,10 +6,10 @@ require(tidyr)
 require(ggplot2)
 require(magrittr)
 require(themis)
-require(pROC)
+require(ROCR)
 
 #Apenas confirmados
-df <- df[df$Classificacao == "Confirmados", ]
+df <- db[df$Classificacao == "Confirmados", ]
 
 # Tratando os dados
 df$DataNotificacao <- NULL
@@ -70,3 +70,21 @@ rf <- randomForest(x = treino_down[,-29],
              keep.forest = T,
 )
 
+OOB.votes <- predict (rf,treino_down[,-29],type="prob");
+OOB.pred <- OOB.votes[,2];
+
+pred.obj <- prediction (OOB.pred,treino_down[29]);
+
+RP.perf <- performance(pred.obj, "rec","prec");
+plot (RP.perf);
+
+ROC.perf <- performance(pred.obj, "tpr","fpr");
+plot (ROC.perf);
+
+medirauc <- performance(pred.obj, measure = "auc");
+auc_ROCR <- medirauc@y.values[[1]]
+auc_ROCR
+
+plot  (RP.perf@alpha.values[[1]],RP.perf@x.values[[1]]);
+lines (RP.perf@alpha.values[[1]],RP.perf@y.values[[1]]);
+lines (ROC.perf@alpha.values[[1]],ROC.perf@x.values[[1]]);
