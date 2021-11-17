@@ -3,27 +3,32 @@ title: "Resultados -> Machine Learning"
 author: "Victor Hugo Ovani Marchetti"
 date: "23/10/2021"
 output:
-  word_document: default
-  html_document: default
-  pdf_document: default
+  github_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+O estudo abaixo utilizou os dados do governo do estado do Espírito Santo para prever, dentre os pacientes que testaram positivo para Covid-19, quais evoluiram para óbito, pela doença ou por outras causas.
+
+```{r cars, echo=FALSE}
 setwd("C:/github/predicao-covid")
 df <- read.csv(file="MICRODADOS.csv", header=TRUE, sep=";", dec=",", stringsAsFactors=T)
+```
+
+# Total de participantes do estudo
+```{r setup, echo=FALSE}
 require(stringr)
 require(dplyr)
 require(tidyr)
 require(ggplot2)
 require(magrittr)
 require(themis)
-require(pROC)
-
-#Apenas confirmados
+require(ROCR)
+length(df)
+```
+# Total de confirmados do estudo
+```{r confirmados, echo=FALSE}
 df <- df[df$Classificacao == "Confirmados", ]
+length(df)
 
-# Tratando os dados
 df$DataNotificacao <- NULL
 df$DataCadastro <- NULL
 df$DataDiagnostico <- NULL
@@ -53,20 +58,27 @@ df$Evolucao <- gsub("Óbito por outras causas", "Óbito", df$Evolucao)
 df <- filter(df, df$Evolucao != "-")
 df <- filter(df, df$Evolucao != "Ignorado")
 df$Evolucao <- as.factor(df$Evolucao)
-summary(df)
-
 # Treino e teste
 linhas <- sample(1:length(df$Evolucao),length(df$Evolucao)*0.70)
 treino <- df[linhas,]
 teste <- df[-linhas,]
-summary(treino)
 treino_down <- recipe(Evolucao~., data=df) %>% 
   themis::step_downsample(Evolucao) %>% 
   prep() %>% 
   juice()
-summary(treino_down)
 
-summary(teste)
+```
+# Total de pacientes em treino
+```{r treino, echo=FALSE}
+length(treino)
+```
+# Total de pacientes em teste
+```{r teste, echo=FALSE}
+length(teste)
+```
+# Total de pacientes em treino após o downsampling
+```{r treino_down, echo=FALSE}
+length(treino_down)
 
 # Algorítmo
 require(randomForest)
@@ -81,30 +93,43 @@ rf <- randomForest(x = treino_down[,-29],
              maxnode = 15,
              keep.forest = T,
 )
-
-
-```
-O estudo abaixo utilizou os dados do governo do estado do Espírito Santo para prever, dentre os pacientes que testaram positivo para Covid-19, quais evoluiram para óbito, pela doença ou por outras causas.
-
-```{r cars}
-summary(cars)
 ```
 
 ## Matriz de confusão do estudo
 
-```{r matrizdeconfusao, echo=FALSE}
+```{r matrizdeconfusao, echo=TRUE}
 print(rf)
 ```
 
-## Curva ROC
+## Variáveis preditivas mais importantes.
 
-```{r roc, echo=FALSE}
-?roc
+```{r pressure, echo=TRUE, fig.height = 15}
+OOB.votes <- predict (rf,teste[,-1],type="prob");
+OOB.pred <- OOB.votes[,2];
 ```
 
-## Variáveis preiditivas mais importantes.
+## Curva ROC e AUC
+```{r rocfinal, echo=TRUE, fig.height = 5}
+pred.obj <- prediction (OOB.pred,teste$Evolucao);
+medirauc <- performance(pred.obj, measure = "auc");
+ROC.perf <- performance(pred.obj, "tpr","fpr");
+plot (ROC.perf);
+auc_ROCR <- medirauc@y.values[[1]]
+auc_ROCR
+```
+## Curvas de Precisão/Recall
+```{r precisãorecall, echo=TRUE, fig.height = 5}
 
-```{r pressure, echo=FALSE, fig.height = 15}
+RP.perf <- performance(pred.obj, "rec","prec");
+plot (RP.perf);
+
+plot  (RP.perf@alpha.values[[1]],RP.perf@x.values[[1]]);
+lines (RP.perf@alpha.values[[1]],RP.perf@y.values[[1]]);
+lines (ROC.perf@alpha.values[[1]],ROC.perf@x.values[[1]]);
+```
+
+###Importância das variáveis
+```{r varimpplot, echo=TRUE, fig.height = 10}
 varImpPlot(rf)
 ```
 
@@ -112,6 +137,11 @@ varImpPlot(rf)
 
 ```{r errosarvores, echo=FALSE}
 plot(rf)
+```
+
+## Estatística descritiva dos dados
+```{r desc, echo=FALSE}
+summary(df)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
